@@ -44,6 +44,14 @@ async function processIncomingPayment(clientAddress, amountRaw) {
   const amount60 = amountUSDC * 0.60;
   const amount15 = amountUSDC * 0.15;
   const amount25 = amountUSDC * 0.25;
+  
+  // Debug: Log all amounts with 6 decimal precision
+  console.log('Amounts:', {
+    total: amountUSDC.toFixed(6),
+    '60%': amount60.toFixed(6),
+    '15%': amount15.toFixed(6),
+    '25%': amount25.toFixed(6)
+  });
 
   // Conectar contrato USDC
   const usdcContract = new ethers.Contract(
@@ -54,11 +62,19 @@ async function processIncomingPayment(clientAddress, amountRaw) {
 
   // Verificar saldo disponible
   const balance = await usdcContract.balanceOf(wallet.address);
-  console.log("Tu saldo de USDC es:", ethers.utils.formatUnits(balance, 6));
-  const amount15Parsed = ethers.utils.parseUnits(amount15.toString(), 6);
+  const amount15Parsed = ethers.utils.parseUnits(amount15.toFixed(6), 6);
+  
+  console.log('Balance check:', {
+    'Wallet Address': wallet.address,
+    'Current USDC Balance': ethers.utils.formatUnits(balance, 6),
+    'Required USDC': amount15.toString(),
+    'Parsed Amount': amount15Parsed.toString()
+  });
 
   if (balance.lt(amount15Parsed)) {
-    const msg = `❌ Saldo insuficiente en wallet para enviar ${amount15} USDC al broker.`;
+    const msg = `❌ Saldo insuficiente en wallet para enviar ${amount15} USDC al broker. ` +
+                `Disponible: ${ethers.utils.formatUnits(balance, 6)} USDC, ` +
+                `Se requiere: ${ethers.utils.formatUnits(amount15Parsed, 6)} USDC`;
     console.error(msg);
     await sendTelegram(msg);
     return;
@@ -66,15 +82,55 @@ async function processIncomingPayment(clientAddress, amountRaw) {
 
   // 1. Transferir 15% al broker
   try {
-    const tx1 = await usdcContract.transfer(BROKER_WALLET, amount15Parsed);
-    await tx1.wait();
-    const msg = `✅ 15% (${amount15} USDC) enviado al broker: ${BROKER_WALLET}`;
-    console.log(msg);
-    await sendTelegram(msg);
+    console.log(`Iniciando transferencia de ${ethers.utils.formatUnits(amount15Parsed, 6)} USDC a ${BROKER_WALLET}...`);
+    
+    // Estimate gas first
+    const estimatedGas = await usdcContract.estimateGas.transfer(BROKER_WALLET, amount15Parsed)
+      .catch(err => {
+        console.error('Error estimando gas:', err);
+        throw new Error(`No se pudo estimar el gas: ${err.reason || err.message}`);
+      });
+    
+    console.log(`Gas estimado: ${estimatedGas.toString()}`);
+    
+    // Add 20% buffer to the estimated gas
+    const gasWithBuffer = Math.floor(estimatedGas * 1.2);
+    
+    // Send the transaction with gas buffer
+    const tx1 = await usdcContract.transfer(BROKER_WALLET, amount15Parsed, {
+      gasLimit: gasWithBuffer
+    });
+    
+    console.log(`Transacción enviada: ${tx1.hash}`);
+    await sendTelegram(`⏳ Transacción enviada: ${tx1.hash}`);
+    
+    // Wait for confirmation
+    const receipt = await tx1.wait();
+    
+    if (receipt.status === 1) {
+      const msg = `✅ 15% (${ethers.utils.formatUnits(amount15Parsed, 6)} USDC) enviado al broker: ${BROKER_WALLET}\n` +
+                 `📄 TX: https://polygonscan.com/tx/${tx1.hash}`;
+      console.log(msg);
+      await sendTelegram(msg);
+    } else {
+      throw new Error('La transacción falló');
+    }
   } catch (err) {
-    const msg = `❌ Error enviando USDC al broker: ${err.message}`;
-    console.error(msg);
-    await sendTelegram(msg);
+    const errorMsg = `❌ Error enviando USDC al broker: ${err.reason || err.message}`;
+    console.error(errorMsg);
+    console.error('Detalles del error:', err);
+    await sendTelegram(errorMsg);
+    
+    // If it's a known error, provide more specific guidance
+    if (err.reason?.includes('insufficient funds for gas')) {
+      const ethBalance = await provider.getBalance(wallet.address);
+      const msg = `⚠️ Fondos insuficientes para gas. ` +
+                 `Necesitas MATIC para pagar las tarifas de gas. ` +
+                 `Balance actual: ${ethers.utils.formatEther(ethBalance)} MATIC`;
+      console.error(msg);
+      await sendTelegram(msg);
+    }
+    
     return;
   }
 
