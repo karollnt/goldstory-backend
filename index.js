@@ -85,6 +85,46 @@ app.get('/', (req, res) => {
   res.send('✅ GoldStory backend activo');
 });
 
+// Handle POST requests from frontend
+app.post('/', async (req, res) => {
+  try {
+    const { txHash, sender, amount, tokenAddress, tokenName, timestamp } = req.body;
+    
+    // Log the incoming request
+    console.log('📥 Received transaction data:', {
+      txHash,
+      sender,
+      amount,
+      tokenAddress,
+      tokenName,
+      timestamp: new Date(timestamp).toISOString()
+    });
+
+    // Convert the amount to the correct format (6 decimal places for USDC)
+    const amountInWei = ethers.utils.parseUnits(amount.toString(), 6);
+    
+    // Process the payment
+    console.log(`Processing payment of ${amount} USDC from ${sender}`);
+    await processIncomingPayment(sender, amountInWei);
+    
+    // Send success response
+    res.json({
+      success: true,
+      message: 'Transaction received and processed successfully',
+      txHash,
+      status: 'completed',
+      amount: amount,
+      token: tokenName
+    });
+  } catch (error) {
+    console.error('❌ Error processing transaction:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
   listenIncomingTransfers().catch(async (err) => {

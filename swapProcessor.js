@@ -38,6 +38,12 @@ async function sendTelegram(message) {
 }
 
 async function processIncomingPayment(clientAddress, amountRaw) {
+  console.log('🔍 processIncomingPayment called with:', { 
+    clientAddress, 
+    amountRaw: amountRaw.toString(),
+    amountInUSDC: ethers.utils.formatUnits(amountRaw, 6) + ' USDC'
+  });
+
   const amountUSDC = parseFloat(ethers.utils.formatUnits(amountRaw, 6));
   console.log(`📥 Procesando pago de $${amountUSDC.toLocaleString()} USDC`);
 
