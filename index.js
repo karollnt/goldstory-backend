@@ -2,29 +2,29 @@
 
 require('dotenv').config();
 const express = require('express');
-const { ethers } = require('ethers');
+const { JsonRpcProvider, formatUnits, Contract } = require('ethers');
 const { processIncomingPayment } = require('./swapProcessor');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
-const RECEIVER_WALLET = "0xd93246390505e23789728e34a057E2fb9FF856fE"; // Tu wallet
+// 🟢 Usa variables seguras desde el entorno (.env o Render)
+const provider = new JsonRpcProvider(process.env.RPC_URL);
+const RECEIVER_WALLET = process.env.RECEIVER_WALLET;
+const USDC_ADDRESS = process.env.USDC_ADDRESS;
 
-const USDC_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"; // USDC en Polygon
-
-// ABI mínimo para escuchar Transferencias
+// ABI mínimo para escuchar eventos Transfer
 const usdcAbi = [
     "event Transfer(address indexed from, address indexed to, uint256 value)"
 ];
 
-// Escucha las transferencias entrantes al wallet receptor
+// Función para escuchar transferencias hacia tu wallet
 async function listenIncomingTransfers() {
-    const contract = new ethers.Contract(USDC_ADDRESS, usdcAbi, provider);
+    const contract = new Contract(USDC_ADDRESS, usdcAbi, provider);
 
     contract.on("Transfer", async (from, to, value) => {
         if (to.toLowerCase() === RECEIVER_WALLET.toLowerCase()) {
-            console.log(`💰 Recibido ${ethers.utils.formatUnits(value, 6)} USDC de ${from}`);
+            console.log(`💰 Recibido ${formatUnits(value, 6)} USDC de ${from}`);
             await processIncomingPayment(from, value);
         }
     });
@@ -32,7 +32,8 @@ async function listenIncomingTransfers() {
     console.log("👂 Escuchando transferencias entrantes a:", RECEIVER_WALLET);
 }
 
-listenIncomingTransfers();
+// Iniciar el servidor y el listener
+listenIncomingTransfers().catch(console.error);
 
 app.get('/', (req, res) => {
     res.send('✅ GoldStory backend activo');
