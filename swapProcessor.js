@@ -54,6 +54,7 @@ async function processIncomingPayment(clientAddress, amountRaw) {
 
   // Verificar saldo disponible
   const balance = await usdcContract.balanceOf(wallet.address);
+  console.log("Tu saldo de USDC es:", ethers.utils.formatUnits(balance, 6));
   const amount15Parsed = ethers.utils.parseUnits(amount15.toString(), 6);
 
   if (balance.lt(amount15Parsed)) {
