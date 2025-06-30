@@ -10,7 +10,8 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
 const RECEIVER_WALLET = process.env.RECEIVER_WALLET;
 const USDC_ADDRESS = process.env.USDC_ADDRESS;
 
-const { formatUnits, Contract } = ethers.utils;
+const { formatUnits } = ethers.utils;
+const { Contract } = ethers;
 
 // ABI mínimo para escuchar evento Transfer
 const usdcAbi = [
