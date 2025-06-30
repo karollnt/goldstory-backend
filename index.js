@@ -1,21 +1,23 @@
 require('dotenv').config();
 const express = require('express');
-const { JsonRpcProvider, formatUnits, Contract } = require('ethers');
+const { ethers } = require('ethers');
 const { processIncomingPayment } = require('./swapProcessor');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Variables seguras desde el entorno
-const provider = new JsonRpcProvider(process.env.RPC_URL);
+const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
 const RECEIVER_WALLET = process.env.RECEIVER_WALLET;
 const USDC_ADDRESS = process.env.USDC_ADDRESS;
 
+const { formatUnits, Contract } = ethers.utils;
+
+// ABI mínimo para escuchar evento Transfer
 const usdcAbi = [
     "event Transfer(address indexed from, address indexed to, uint256 value)"
 ];
 
-// Función para escuchar transferencias hacia tu wallet
+// Función para escuchar transferencias entrantes a tu wallet USDC
 async function listenIncomingTransfers() {
     const contract = new Contract(USDC_ADDRESS, usdcAbi, provider);
 
@@ -29,11 +31,12 @@ async function listenIncomingTransfers() {
     console.log("👂 Escuchando transferencias entrantes a:", RECEIVER_WALLET);
 }
 
-// Iniciar servidor HTTP y luego el listener
+// Endpoint básico para comprobar que el backend está activo
 app.get('/', (req, res) => {
     res.send('✅ GoldStory backend activo');
 });
 
+// Inicia servidor y luego el listener
 app.listen(PORT, () => {
     console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
     listenIncomingTransfers().catch(err => {
