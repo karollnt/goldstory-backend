@@ -8,36 +8,16 @@ const { processIncomingPayment } = require('./swapProcessor');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configure CORS with specific origins
-const allowedOrigins = [
-  'https://goldstory.site',
-  'http://localhost:3000',
-  'http://localhost:5173'
-];
-
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      console.warn(`Blocked request from origin: ${origin}`);
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
+// Simple CORS configuration
+app.use(cors({
+  origin: ['https://goldstory.site', 'http://localhost:3000', 'http://localhost:5173'],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  maxAge: 600 // Cache preflight request for 10 minutes
-};
-
-// Apply CORS middleware
-app.use(cors(corsOptions));
+  credentials: true
+}));
 
 // Handle preflight requests
-app.options('*', cors(corsOptions));
+app.options('*', cors());
 
 // Función para enviar notificaciones por Telegram
 async function sendTelegram(message) {
