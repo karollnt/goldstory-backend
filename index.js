@@ -9,12 +9,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Simple CORS configuration
-app.use(cors({
-  origin: ['https://goldstory.site', 'http://localhost:3000', 'http://localhost:5173'],
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: 'https://goldstory.site'
+  })
+);
 
 // Handle preflight requests
 app.options('*', cors());
@@ -29,19 +28,19 @@ async function sendTelegram(message) {
     await axios.post(url, {
       chat_id: chatId,
       text: message,
-      parse_mode: 'Markdown',
+      parse_mode: 'Markdown'
     });
-    console.log("📲 Mensaje enviado a Telegram");
+    console.log('📲 Mensaje enviado a Telegram');
   } catch (error) {
-    console.error("❌ Error enviando a Telegram:", error.message);
+    console.error('❌ Error enviando a Telegram:', error.message);
   }
 }
 
 // Logs para verificar variables de entorno
-console.log("🔍 Variables de entorno:");
-console.log("USDC_ADDRESS:", process.env.USDC_ADDRESS);
-console.log("RECEIVER_WALLET:", process.env.RECEIVER_WALLET);
-console.log("RPC_URL:", process.env.RPC_URL);
+console.log('🔍 Variables de entorno:');
+console.log('USDC_ADDRESS:', process.env.USDC_ADDRESS);
+console.log('RECEIVER_WALLET:', process.env.RECEIVER_WALLET);
+console.log('RPC_URL:', process.env.RPC_URL);
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
 const RECEIVER_WALLET = process.env.RECEIVER_WALLET;
@@ -51,20 +50,18 @@ const { formatUnits } = ethers.utils;
 const { Contract } = ethers;
 
 // ABI mínimo para escuchar evento Transfer
-const usdcAbi = [
-  "event Transfer(address indexed from, address indexed to, uint256 value)"
-];
+const usdcAbi = ['event Transfer(address indexed from, address indexed to, uint256 value)'];
 
 async function listenIncomingTransfers() {
   if (!USDC_ADDRESS) {
-    const msg = "❌ USDC_ADDRESS no está definido. Verifica tu variable de entorno.";
+    const msg = '❌ USDC_ADDRESS no está definido. Verifica tu variable de entorno.';
     console.error(msg);
     await sendTelegram(msg);
     return;
   }
 
   if (!RECEIVER_WALLET) {
-    const msg = "❌ RECEIVER_WALLET no está definido. Verifica tu variable de entorno.";
+    const msg = '❌ RECEIVER_WALLET no está definido. Verifica tu variable de entorno.';
     console.error(msg);
     await sendTelegram(msg);
     return;
@@ -72,7 +69,7 @@ async function listenIncomingTransfers() {
 
   const contract = new Contract(USDC_ADDRESS, usdcAbi, provider);
 
-  contract.on("Transfer", async (from, to, value) => {
+  contract.on('Transfer', async (from, to, value) => {
     if (to.toLowerCase() === RECEIVER_WALLET.toLowerCase()) {
       const amount = formatUnits(value, 6);
       const log = `💰 Recibido ${amount} USDC de ${from}`;
@@ -82,7 +79,7 @@ async function listenIncomingTransfers() {
     }
   });
 
-  console.log("👂 Escuchando transferencias entrantes a:", RECEIVER_WALLET);
+  console.log('👂 Escuchando transferencias entrantes a:', RECEIVER_WALLET);
 }
 
 app.get('/', (req, res) => {
@@ -92,7 +89,7 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
   listenIncomingTransfers().catch(async (err) => {
-    console.error("❌ Error iniciando listener de transferencias:", err);
+    console.error('❌ Error iniciando listener de transferencias:', err);
     await sendTelegram(`⚠️ *Error crítico en backend:*\n\`${err.message}\``);
   });
 });
