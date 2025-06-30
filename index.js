@@ -1,11 +1,30 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const { ethers } = require('ethers');
 const axios = require('axios');
 const { processIncomingPayment } = require('./swapProcessor');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configure CORS
+const corsOptions = {
+  origin: [
+    'https://goldstory.site',
+    'http://localhost:3000',  // for local development
+    'http://localhost:5173'   // common Vite dev server port
+  ],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
 
 // Función para enviar notificaciones por Telegram
 async function sendTelegram(message) {
