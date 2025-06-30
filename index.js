@@ -15,8 +15,7 @@ app.use(
   })
 );
 
-// Handle preflight requests
-app.options('*', cors());
+app.use(express.json());
 
 // Función para enviar notificaciones por Telegram
 async function sendTelegram(message) {
