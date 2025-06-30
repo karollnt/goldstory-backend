@@ -39,6 +39,12 @@ async function processIncomingPayment(clientAddress, amountRaw) {
     ["function transfer(address to, uint amount) public returns (bool)"],
     wallet
   );
+ const balance = await usdcContract.balanceOf(wallet.address);
+if (balance.lt(ethers.utils.parseUnits(amount15.toString(), 6))) {
+  console.error("❌ No hay suficiente USDC para enviar al broker.");
+  await sendTelegram(`❌ *Saldo insuficiente de USDC para el pago al broker.*`);
+  return;
+}
 
   const tx1 = await usdcContract.transfer(BROKER_WALLET, ethers.utils.parseUnits(amount15.toString(), 6));
   await tx1.wait();
