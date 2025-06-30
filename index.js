@@ -1,10 +1,29 @@
 require('dotenv').config();
 const express = require('express');
 const { ethers } = require('ethers');
+const axios = require('axios');
 const { processIncomingPayment } = require('./swapProcessor');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Función para enviar notificaciones por Telegram
+async function sendTelegram(message) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
+
+    try {
+        await axios.post(url, {
+            chat_id: chatId,
+            text: message,
+            parse_mode: 'Markdown'
+        });
+        console.log("📲 Mensaje enviado a Telegram");
+    } catch (error) {
+        console.error("❌ Error enviando a Telegram:", error.message);
+    }
+}
 
 // Logs para verificar variables de entorno
 console.log("🔍 Variables de entorno:");
@@ -26,18 +45,27 @@ const usdcAbi = [
 
 async function listenIncomingTransfers() {
     if (!USDC_ADDRESS) {
-        console.error("❌ USDC_ADDRESS no está definido. Verifica tu variable de entorno.");
+        const msg = "❌ USDC_ADDRESS no está definido. Verifica tu variable de entorno.";
+        console.error(msg);
+        await sendTelegram(msg);
         return;
     }
+
     if (!RECEIVER_WALLET) {
-        console.error("❌ RECEIVER_WALLET no está definido. Verifica tu variable de entorno.");
+        const msg = "❌ RECEIVER_WALLET no está definido. Verifica tu variable de entorno.";
+        console.error(msg);
+        await sendTelegram(msg);
         return;
     }
+
     const contract = new Contract(USDC_ADDRESS, usdcAbi, provider);
 
     contract.on("Transfer", async (from, to, value) => {
         if (to.toLowerCase() === RECEIVER_WALLET.toLowerCase()) {
-            console.log(`💰 Recibido ${formatUnits(value, 6)} USDC de ${from}`);
+            const amount = formatUnits(value, 6);
+            const log = `💰 Recibido ${amount} USDC de ${from}`;
+            console.log(log);
+            await sendTelegram(`💰 *Pago recibido:*\n${amount} USDC\n👤 De: \`${from}\``);
             await processIncomingPayment(from, value);
         }
     });
@@ -51,7 +79,5 @@ app.get('/', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
-    listenIncomingTransfers().catch(err => {
-        console.error("❌ Error iniciando listener de transferencias:", err);
-    });
-});
+    listenIncomingTransfers().catch(async err => {
+        console.error("❌ Error iniciando liste
