@@ -1,5 +1,7 @@
-
 const { ethers } = require("ethers");
+const express = require("express");
+const app = express();
+const PORT = process.env.PORT || 3000;
 const {
   ChainId,
   Token,
@@ -10,6 +12,8 @@ const {
 const { AlphaRouter } = require("@uniswap/smart-order-router");
 const axios = require("axios");
 require("dotenv").config();
+
+app.use(express.json());
 
 // Configuración del provider y wallet
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
@@ -45,11 +49,7 @@ async function processIncomingPayment(clientAddress, amountRaw) {
     amountInUSDC: ethers.utils.formatUnits(amountRaw, 6) + ' USDC'
   });
 
-  const amountUSDC = parseFloat(
-    typeof amountRaw === "string"
-      ? ethers.utils.formatUnits(amountRaw, 6)
-      : ethers.utils.formatUnits(amountRaw.toString(), 6)
-  );
+  const amountUSDC = parseFloat(ethers.utils.formatUnits(amountRaw, 6));
   console.log(`📥 Procesando pago de $${amountUSDC.toLocaleString()} USDC`);
 
   const amount60 = amountUSDC * 0.60;
@@ -104,8 +104,7 @@ async function processIncomingPayment(clientAddress, amountRaw) {
     await sendTelegram(`⏳ Transacción enviada: ${tx1.hash}`);
     const receipt = await tx1.wait();
     if (receipt.status === 1) {
-      const msg = `✅ 15% (${ethers.utils.formatUnits(amount15Parsed, 6)} USDC) enviado al broker: ${BROKER_WALLET}
-` +
+      const msg = `✅ 15% (${ethers.utils.formatUnits(amount15Parsed, 6)} USDC) enviado al broker: ${BROKER_WALLET}\n` +
                  `📄 TX: https://polygonscan.com/tx/${tx1.hash}`;
       console.log(msg);
       await sendTelegram(msg);
@@ -143,10 +142,8 @@ async function processIncomingPayment(clientAddress, amountRaw) {
   );
 
   if (!route) {
-    const msg = `❌ No se pudo generar ruta de swap USDC → GS. 
-` +
-                `Verifica si el pool en Uniswap tiene liquidez activa:
-` +
+    const msg = `❌ No se pudo generar ruta de swap USDC → GS. \n` +
+                `Verifica si el pool en Uniswap tiene liquidez activa:\n` +
                 `👉 https://app.uniswap.org/#/swap?inputCurrency=${USDC_ADDRESS}&outputCurrency=${GS_TOKEN_ADDRESS}`;
     console.error(msg);
     await sendTelegram(msg);
@@ -155,10 +152,8 @@ async function processIncomingPayment(clientAddress, amountRaw) {
 
   const maticBalance = await provider.getBalance(wallet.address);
   if (maticBalance.lt(ethers.utils.parseEther("0.01"))) {
-    const msg = `⚠️ Balance de MATIC insuficiente para ejecutar el swap. 
-` +
-                `Necesitas al menos 0.01 MATIC.
-` +
+    const msg = `⚠️ Balance de MATIC insuficiente para ejecutar el swap. \n` +
+                `Necesitas al menos 0.01 MATIC.\n` +
                 `Balance actual: ${ethers.utils.formatEther(maticBalance)} MATIC`;
     console.error(msg);
     await sendTelegram(msg);
@@ -187,5 +182,27 @@ async function processIncomingPayment(clientAddress, amountRaw) {
   console.log(retencionMsg);
   await sendTelegram(retencionMsg);
 }
+
+// Ruta para activar el pago manualmente (útil para pruebas)
+app.post("/trigger", async (req, res) => {
+  const { clientAddress, amountRaw } = req.body;
+
+  if (!clientAddress || !amountRaw) {
+    return res.status(400).send("Faltan parámetros: clientAddress o amountRaw");
+  }
+
+  try {
+    await processIncomingPayment(clientAddress, ethers.BigNumber.from(amountRaw));
+    res.send("✅ Pago procesado correctamente.");
+  } catch (err) {
+    console.error("❌ Error en endpoint:", err);
+    res.status(500).send("❌ Error procesando el pago.");
+  }
+});
+
+// Iniciar servidor
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+});
 
 module.exports = { processIncomingPayment };
