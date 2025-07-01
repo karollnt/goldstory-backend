@@ -1,7 +1,5 @@
 const { ethers } = require("ethers");
-const express = require("express");
-const app = express();
-const PORT = process.env.PORT || 3000;
+
 const {
   ChainId,
   Token,
@@ -12,8 +10,6 @@ const {
 const { AlphaRouter } = require("@uniswap/smart-order-router");
 const axios = require("axios");
 require("dotenv").config();
-
-app.use(express.json());
 
 // Configuración del provider y wallet
 const provider = new ethers.providers.JsonRpcProvider(process.env.RPC_URL);
@@ -182,27 +178,5 @@ async function processIncomingPayment(clientAddress, amountRaw) {
   console.log(retencionMsg);
   await sendTelegram(retencionMsg);
 }
-
-// Ruta para activar el pago manualmente (útil para pruebas)
-app.post("/trigger", async (req, res) => {
-  const { clientAddress, amountRaw } = req.body;
-
-  if (!clientAddress || !amountRaw) {
-    return res.status(400).send("Faltan parámetros: clientAddress o amountRaw");
-  }
-
-  try {
-    await processIncomingPayment(clientAddress, ethers.BigNumber.from(amountRaw));
-    res.send("✅ Pago procesado correctamente.");
-  } catch (err) {
-    console.error("❌ Error en endpoint:", err);
-    res.status(500).send("❌ Error procesando el pago.");
-  }
-});
-
-// Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
-});
 
 module.exports = { processIncomingPayment };
