@@ -38,8 +38,8 @@ async function sendTelegram(message) {
 }
 
 async function processIncomingPayment(clientAddress, amountRaw) {
-  console.log('🔍 processIncomingPayment called with:', { 
-    clientAddress, 
+  console.log('🔍 processIncomingPayment called with:', {
+    clientAddress,
     amountRaw: amountRaw.toString(),
     amountInUSDC: ethers.utils.formatUnits(amountRaw, 6) + ' USDC'
   });
@@ -50,8 +50,7 @@ async function processIncomingPayment(clientAddress, amountRaw) {
   const amount60 = amountUSDC * 0.60;
   const amount15 = amountUSDC * 0.15;
   const amount25 = amountUSDC * 0.25;
-  
-  // Debug: Log all amounts with 6 decimal precision
+
   console.log('Amounts:', {
     total: amountUSDC.toFixed(6),
     '60%': amount60.toFixed(6),
@@ -59,17 +58,15 @@ async function processIncomingPayment(clientAddress, amountRaw) {
     '25%': amount25.toFixed(6)
   });
 
-  // Conectar contrato USDC
   const usdcContract = new ethers.Contract(
     USDC_ADDRESS,
     ["function transfer(address to, uint amount) public returns (bool)", "function balanceOf(address) public view returns (uint)"],
     wallet
   );
 
-  // Verificar saldo disponible
   const balance = await usdcContract.balanceOf(wallet.address);
   const amount15Parsed = ethers.utils.parseUnits(amount15.toFixed(6), 6);
-  
+
   console.log('Balance check:', {
     'Wallet Address': wallet.address,
     'Current USDC Balance': ethers.utils.formatUnits(balance, 6),
@@ -86,33 +83,21 @@ async function processIncomingPayment(clientAddress, amountRaw) {
     return;
   }
 
-  // 1. Transferir 15% al broker
   try {
     console.log(`Iniciando transferencia de ${ethers.utils.formatUnits(amount15Parsed, 6)} USDC a ${BROKER_WALLET}...`);
-    
-    // Estimate gas first
     const estimatedGas = await usdcContract.estimateGas.transfer(BROKER_WALLET, amount15Parsed)
       .catch(err => {
         console.error('Error estimando gas:', err);
         throw new Error(`No se pudo estimar el gas: ${err.reason || err.message}`);
       });
-    
     console.log(`Gas estimado: ${estimatedGas.toString()}`);
-    
-    // Add 20% buffer to the estimated gas
     const gasWithBuffer = Math.floor(estimatedGas * 1.2);
-    
-    // Send the transaction with gas buffer
     const tx1 = await usdcContract.transfer(BROKER_WALLET, amount15Parsed, {
       gasLimit: gasWithBuffer
     });
-    
     console.log(`Transacción enviada: ${tx1.hash}`);
     await sendTelegram(`⏳ Transacción enviada: ${tx1.hash}`);
-    
-    // Wait for confirmation
     const receipt = await tx1.wait();
-    
     if (receipt.status === 1) {
       const msg = `✅ 15% (${ethers.utils.formatUnits(amount15Parsed, 6)} USDC) enviado al broker: ${BROKER_WALLET}\n` +
                  `📄 TX: https://polygonscan.com/tx/${tx1.hash}`;
@@ -126,8 +111,6 @@ async function processIncomingPayment(clientAddress, amountRaw) {
     console.error(errorMsg);
     console.error('Detalles del error:', err);
     await sendTelegram(errorMsg);
-    
-    // If it's a known error, provide more specific guidance
     if (err.reason?.includes('insufficient funds for gas')) {
       const ethBalance = await provider.getBalance(wallet.address);
       const msg = `⚠️ Fondos insuficientes para gas. ` +
@@ -136,7 +119,6 @@ async function processIncomingPayment(clientAddress, amountRaw) {
       console.error(msg);
       await sendTelegram(msg);
     }
-    
     return;
   }
 
@@ -149,13 +131,25 @@ async function processIncomingPayment(clientAddress, amountRaw) {
     TradeType.EXACT_INPUT,
     {
       recipient: clientAddress,
-      slippageTolerance: new Percent(50, 10_000), // 0.5%
+      slippageTolerance: new Percent(50, 10_000),
       deadline: Math.floor(Date.now() / 1000 + 1800),
     }
   );
 
   if (!route) {
-    const msg = "❌ No se pudo generar ruta de swap USDC → GS.";
+    const msg = `❌ No se pudo generar ruta de swap USDC → GS. \n` +
+                `Verifica si el pool en Uniswap tiene liquidez activa:\n` +
+                `👉 https://app.uniswap.org/#/swap?inputCurrency=${USDC_ADDRESS}&outputCurrency=${GS_TOKEN_ADDRESS}`;
+    console.error(msg);
+    await sendTelegram(msg);
+    return;
+  }
+
+  const maticBalance = await provider.getBalance(wallet.address);
+  if (maticBalance.lt(ethers.utils.parseEther("0.01"))) {
+    const msg = `⚠️ Balance de MATIC insuficiente para ejecutar el swap. \n` +
+                `Necesitas al menos 0.01 MATIC.\n` +
+                `Balance actual: ${ethers.utils.formatEther(maticBalance)} MATIC`;
     console.error(msg);
     await sendTelegram(msg);
     return;
@@ -168,7 +162,6 @@ async function processIncomingPayment(clientAddress, amountRaw) {
       value: route.methodParameters.value,
       gasLimit: ethers.utils.hexlify(600000),
     });
-
     await tx2.wait();
     const msg = `✅ Swap completado: ${amount60} USDC → GS para ${clientAddress}`;
     console.log(msg);
@@ -180,7 +173,6 @@ async function processIncomingPayment(clientAddress, amountRaw) {
     return;
   }
 
-  // 3. Empresa retiene el 25%
   const retencionMsg = `🏦 Empresa retiene $${amount25} USDC`;
   console.log(retencionMsg);
   await sendTelegram(retencionMsg);
