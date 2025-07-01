@@ -45,6 +45,9 @@ async function processIncomingPayment(clientAddress, amountRaw) {
     amountInUSDC: ethers.utils.formatUnits(amountRaw, 6) + ' USDC'
   });
 
+  console.log("🧾 amountRaw recibido:", amountRaw.toString());
+  console.log("💲 Formateado a USDC:", ethers.utils.formatUnits(amountRaw, 6));
+
   const amountUSDC = parseFloat(ethers.utils.formatUnits(amountRaw, 6));
   console.log(`📥 Procesando pago de $${amountUSDC.toLocaleString()} USDC`);
 
