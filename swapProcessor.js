@@ -100,8 +100,7 @@ async function processIncomingPayment(clientAddress, amountRaw) {
     try {
       await sendTelegram(`⏳ Transacción enviada: ${tx1.hash}`);
     } catch (telegramErr) {
-      console.error('Error enviando notificación a Telegram:', telegramErr);
-      // Continue even if Telegram notification fails
+      console.error('❌ Error enviando notificación a Telegram:', telegramErr);
     }
 
     console.log('Esperando confirmación de la transacción (tiempo máximo: 2 minutos)...');
@@ -123,13 +122,13 @@ async function processIncomingPayment(clientAddress, amountRaw) {
         try {
           await sendTelegram(msg);
         } catch (telegramErr) {
-          console.error('Error enviando notificación de éxito a Telegram:', telegramErr);
+          console.error('❌ Error enviando notificación de éxito a Telegram:', telegramErr);
         }
       } else {
         throw new Error('La transacción falló');
       }
     } catch (waitError) {
-      console.error('Error esperando la transacción:', waitError);
+      console.error('❌ Error esperando la transacción:', waitError);
       console.error('Detalles del error:', {
         hash: tx1.hash,
         blockNumber: waitError.receipt?.blockNumber,
@@ -211,4 +210,4 @@ async function processIncomingPayment(clientAddress, amountRaw) {
   await sendTelegram(retencionMsg);
 }
 
-module.exports = { processIncomingPayment };
+module.exports = { processIncomingPayment, sendTelegram };
