@@ -33,21 +33,23 @@ async function sendTelegram(message) {
 }
 
 async function processIncomingPayment(clientAddress, amountRaw) {
-  console.log('🔍 processIncomingPayment called with:', {
+  const receivedData = {
     clientAddress,
     amountRaw: amountRaw.toString(),
-    amountInUSDC: ethers.utils.formatUnits(amountRaw, 6) + ' USDC'
-  });
+    amountInUSDC: ethers.utils.formatUnits(amountRaw, 6)
+  };
+  console.log('🔍 processIncomingPayment called with:', receivedData);
 
-  console.log('🧾 amountRaw recibido:', amountRaw.toString());
-  console.log('💲 Formateado a USDC:', ethers.utils.formatUnits(amountRaw, 6));
+  console.log('🧾 amountRaw recibido: ', receivedData.amountRaw);
+  console.log('💲 Formateado a USDC: ', receivedData.amountInUSDC);
 
-  const amountUSDC = parseFloat(ethers.utils.formatUnits(amountRaw, 6));
+  const amountUSDC = parseFloat(receivedData.amountInUSDC);
   console.log(`📥 Procesando pago de $${amountUSDC.toLocaleString()} USDC`);
 
   const amount60 = amountUSDC * 0.6;
   const amount15 = amountUSDC * 0.15;
   const amount25 = amountUSDC * 0.25;
+  sendTelegram(`Transaccion recibida desde wallet '${clientAddress}' por ${receivedData.amountInUSDC} USDC (raw ${receivedData.amountRaw}). El 40% es ${amountUSDC * 0.4}`);
 
   console.log('Amounts:', {
     total: amountUSDC.toFixed(6),
